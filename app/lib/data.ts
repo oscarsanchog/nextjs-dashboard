@@ -7,6 +7,7 @@ import {
   LatestInvoiceRaw,
   User,
   Revenue,
+  FormattedCustomersTable
 } from './definitions';
 import { formatCurrency } from './utils';
 import { unstable_noStore as noStore } from 'next/cache';
@@ -96,8 +97,7 @@ export async function fetchCardData() {
 const ITEMS_PER_PAGE = 6;
 export async function fetchFilteredInvoices(
   query: string,
-  currentPage: number,
-) {
+  currentPage: number) {
   noStore()
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
@@ -188,6 +188,31 @@ export async function fetchCustomers() {
         name
       FROM customers
       ORDER BY name ASC
+    `;
+
+    const customers = data.rows;
+    return customers;
+  } catch (err) {
+    console.error('Database Error:', err);
+    throw new Error('Failed to fetch all customers.');
+  }
+}
+
+export async function fetchAllCustomers() {
+  try {
+    const data = await sql<FormattedCustomersTable>`
+    SELECT
+    customers.id,
+    customers.name,
+    customers.email,
+    customers.image_URL,
+    COUNT(invoices.id) AS total_invoices,
+    SUM(CASE WHEN invoices.status = 'pending' THEN invoices.amount ELSE 0 END) AS total_pending,
+    SUM(CASE WHEN invoices.status = 'paid' THEN invoices.amount ELSE 0 END) AS total_paid
+  FROM customers
+  JOIN invoices ON invoices.customer_id = customers.id
+  GROUP BY customers.id, customers.name, customers.email, customers.image_URL
+  ORDER BY name ASC;
     `;
 
     const customers = data.rows;
